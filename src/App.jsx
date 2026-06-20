@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { PAIRINGS } from "./data/pairings.js";
-import { matchesFilters, deriveOptions, comboOf } from "./lib/filters.js";
+import { matchesFilters, deriveOptions } from "./lib/filters.js";
 import { generatePalette, seedAccent } from "./lib/colors.js";
 import { pairingIdFromHash } from "./lib/export.js";
-import { buildCatalog, rankPairings, pickGenerated } from "./lib/engine.js";
+import { sampleGenerated } from "./lib/engine.js";
+import { FONT_CATALOG } from "./data/fontCatalog.js";
 import Controls from "./components/Controls.jsx";
 import PreviewPanel from "./components/PreviewPanel.jsx";
 import PalettePanel from "./components/PalettePanel.jsx";
@@ -52,12 +53,12 @@ export default function App() {
     return filters.savedOnly ? list.filter((p) => saved.has(p.id)) : list;
   }, [filters, saved]);
 
-  // Engine: catalog + ranked novel pairings (excluding curated combos).
-  const ranked = useMemo(() => {
-    const catalog = buildCatalog(PAIRINGS);
-    const exclude = new Set(PAIRINGS.map((p) => `${p.heading.family}|${p.body.family}`));
-    return rankPairings(catalog, { excludePairs: exclude });
-  }, []);
+  // Engine generates from the full Google Fonts catalog; curated heading/body
+  // combos are excluded so generated pairings are always novel.
+  const excludePairs = useMemo(
+    () => new Set(PAIRINGS.map((p) => `${p.heading.family}|${p.body.family}`)),
+    []
+  );
 
   // Resolve the active pairing within the current matches. -1 (not found) or a
   // null activeId both collapse to the first match. A live generated pairing,
@@ -103,14 +104,15 @@ export default function App() {
     setActiveId(matches[nextIndex].id);
   };
 
-  // Produce a fresh algorithmic pairing, honoring active strategy + combo filters.
+  // Produce a fresh algorithmic pairing from the full catalog, honoring active
+  // strategy + combo filters.
   const handleGenerate = () => {
-    let pool = ranked;
-    if (filters.strategy) pool = pool.filter((r) => r.strategy === filters.strategy);
-    if (filters.combos?.length) {
-      pool = pool.filter((r) => filters.combos.includes(comboOf(r.h.category, r.b.category)));
-    }
-    const next = pickGenerated(pool, generated?.id);
+    const next = sampleGenerated(FONT_CATALOG, {
+      strategy: filters.strategy,
+      combos: filters.combos,
+      exclude: excludePairs,
+      lastId: generated?.id,
+    });
     if (next) setGenerated(next);
   };
 
@@ -203,7 +205,7 @@ export default function App() {
               <button
                 className="btn btn--generate"
                 onClick={handleGenerate}
-                title="Generate a new pairing algorithmically"
+                title={`Generate a new pairing from ${FONT_CATALOG.length} Google Fonts`}
               >
                 ✨ {generated ? "Generate again" : "Generate"}
               </button>

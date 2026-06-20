@@ -191,8 +191,9 @@ export function generatePairing(entry) {
     id,
     generated: true,
     score,
-    heading: { family: h.family, category: h.category, weights: h.weights },
-    body: { family: b.family, category: b.category, weights: b.weights },
+    // Carry cls so downstream (cssFamily/near-matches) uses the catalog's class.
+    heading: { family: h.family, category: h.category, weights: h.weights, cls: h.cls },
+    body: { family: b.family, category: b.category, weights: b.weights, cls: b.cls },
     strategy,
     moods,
     useCases,
@@ -205,7 +206,7 @@ export function generatePairing(entry) {
 }
 
 // Pick one generated pairing from the top of the ranking, avoiding an exact
-// repeat of the last one shown.
+// repeat of the last one shown. (Used for small, pre-ranked pools.)
 export function pickGenerated(ranked, lastId = null) {
   if (!ranked.length) return null;
   const top = ranked.slice(0, Math.min(15, ranked.length));
@@ -218,4 +219,59 @@ export function pickGenerated(ranked, lastId = null) {
     }
   }
   return generatePairing(entry);
+}
+
+function comboOf(a, b) {
+  if (a !== b) return "mixed";
+  return a === "serif" ? "serif-serif" : "sans-sans";
+}
+
+// Superfamily strategy is rare (a handful of known systems), so it can't be
+// found by random sampling — draw directly from groups present in the catalog.
+function sampleSuperfamily(catalog, exclude, lastId) {
+  const present = new Set(catalog.map((f) => f.family));
+  const groups = SUPERFAMILIES.filter((g) => g.every((fam) => present.has(fam)));
+  if (!groups.length) return null;
+  for (let i = 0; i < 30; i++) {
+    const g = groups[(Math.random() * groups.length) | 0];
+    const a = g[(Math.random() * g.length) | 0];
+    const b = g[(Math.random() * g.length) | 0];
+    if (a === b) continue;
+    if (exclude.has(`${a}|${b}`)) continue;
+    const fa = catalog.find((f) => f.family === a);
+    const fb = catalog.find((f) => f.family === b);
+    const s = scorePair(fa, fb);
+    if (!s) continue;
+    const gen = generatePairing({ h: fa, b: fb, ...s });
+    if (gen.id === lastId) continue;
+    return gen;
+  }
+  return null;
+}
+
+// Scalable generation: randomly sample heading/body pairs and accept the first
+// that clears the score threshold and matches the active filters. O(attempts)
+// regardless of catalog size — no need to materialize every combination.
+export function sampleGenerated(
+  catalog,
+  { strategy = null, combos = [], minScore = 58, exclude = new Set(), lastId = null, attempts = 600 } = {}
+) {
+  if (!catalog || catalog.length < 2) return null;
+  if (strategy === "superfamily") return sampleSuperfamily(catalog, exclude, lastId);
+
+  const pick = () => catalog[(Math.random() * catalog.length) | 0];
+  for (let i = 0; i < attempts; i++) {
+    const h = pick();
+    const b = pick();
+    if (h.family === b.family) continue;
+    if (combos.length && !combos.includes(comboOf(h.category, b.category))) continue;
+    const s = scorePair(h, b);
+    if (!s || s.score < minScore) continue;
+    if (strategy && s.strategy !== strategy) continue;
+    if (exclude.has(`${h.family}|${b.family}`)) continue;
+    const gen = generatePairing({ h, b, ...s });
+    if (gen.id === lastId) continue;
+    return gen;
+  }
+  return null; // very restrictive filters exhausted the attempt budget
 }

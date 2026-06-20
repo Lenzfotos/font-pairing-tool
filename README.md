@@ -12,7 +12,7 @@ Every font previews live and legally via the Google Fonts API. No specimen image
 - **Generated color palettes** — a perceptual color engine (OKLCH via culori, ramps via chroma-js) derives a coherent palette from each pairing; toggle to apply it to the live preview.
 - **Near-match substitution** — every font carries a web-safe CSS fallback stack plus named alternatives for platforms lacking the exact face.
 - **Export &amp; share** — copy ready-to-paste CSS (`@import` + `font-family` + palette custom properties), save favorites (localStorage), and deep-link any pairing via the URL hash.
-- **Algorithmic pairing engine** — classifies fonts and scores every combination against typographic rules to generate novel, honestly-derived pairings on demand.
+- **Algorithmic pairing engine** — classifies fonts and scores combinations against typographic rules to generate novel, honestly-derived pairings on demand. Generation samples the **entire Google Fonts serif/sans library** (~1,300 families, auto-classified in `src/data/fontCatalog.js`), so it stays instant regardless of catalog size.
 - **Per-font platform availability** — badges computed per font and AND-ed across the pairing, distinguishing **verified** (Google, Figma) from **estimated** (Adobe, Canva).
 
 ## Tech stack
@@ -26,9 +26,10 @@ Every font previews live and legally via the Google Fonts API. No specimen image
 
 ```bash
 npm install
-npm run dev      # start the dev server
-npm run build    # production build
-npm run preview  # preview the production build
+npm run dev            # start the dev server
+npm run build          # production build
+npm run preview        # preview the production build
+npm run build:catalog  # regenerate src/data/fontCatalog.js from Google Fonts
 ```
 
 ## Project structure
@@ -38,6 +39,7 @@ src/
   App.jsx                 # owns all state; filters -> matches -> active pairing
   data/
     pairings.js           # curated pairing dataset (ships in the bundle)
+    fontCatalog.js        # auto-generated full Google Fonts catalog (engine pool)
     fontAvailability.js   # per-font Adobe/Canva estimates
   lib/
     fonts.js              # Google Fonts URL + font-family stack builder

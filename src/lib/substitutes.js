@@ -69,10 +69,17 @@ const CATEGORY_DEFAULT = {
   monospace: ["SFMono-Regular", "Menlo", "monospace"],
 };
 
-// Visual class of a font (e.g. "didone", "grotesque-sans"), or a sensible
-// category-based default when the family isn't individually mapped. Used by the
-// pairing engine to reason about compatibility.
+// The curated visual class for a family, or null if it isn't individually
+// mapped. Used by the catalog build script to preserve hand-tuned classes.
+export function curatedClass(family) {
+  return FONTS[family]?.cls ?? null;
+}
+
+// Visual class of a font (e.g. "didone", "grotesque-sans"). Prefers a class
+// baked onto the spec (e.g. catalog entries), then the curated map, then a
+// sensible category-based default.
 export function fontClass(spec) {
+  if (spec.cls) return spec.cls;
   const entry = FONTS[spec.family];
   if (entry) return entry.cls;
   return spec.category === "serif" ? "old-style" : "grotesque-sans";
