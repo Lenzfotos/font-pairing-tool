@@ -24,6 +24,16 @@ const HARMONY_ROTATION = {
   monochromatic: 0, // partner differs by lightness/chroma only
 };
 
+// Selectable harmonies, in display order.
+export const HARMONIES = ["complementary", "analogous", "triadic", "monochromatic"];
+
+// The base accent a palette is generated from (curated colors[1], else colors[0],
+// else a default). Exposed so callers can seed a color picker with it.
+export function seedAccent(seedPalette) {
+  const seed = seedPalette?.colors?.[1] || seedPalette?.colors?.[0] || "#3b5bdb";
+  return chroma(seed).hex();
+}
+
 function rotateHue(hex, degrees) {
   const c = toOklch(hex);
   if (!c) return hex;
@@ -50,11 +60,7 @@ function neutral(hex, lightness, chromaScale) {
 
 export function generatePalette(seedPalette) {
   const harmony = seedPalette?.harmony || "complementary";
-  // Seed = curated accent (index 1) when present, else first color, else a default.
-  const seed =
-    seedPalette?.colors?.[1] || seedPalette?.colors?.[0] || "#3b5bdb";
-
-  const accent = chroma(seed).hex();
+  const accent = seedAccent(seedPalette);
   const partner = rotateHue(accent, HARMONY_ROTATION[harmony] ?? 180);
 
   const bg = neutral(accent, 0.985, 0.25); // tinted near-white

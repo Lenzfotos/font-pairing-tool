@@ -23,13 +23,11 @@ export default function Controls({ filters, options, onChange, resultCount, save
   const toggleSingle = (key, value) =>
     set({ [key]: filters[key] === value ? null : value });
 
-  // Multi-select platforms: add/remove from the array.
-  const togglePlatform = (plat) => {
-    const have = filters.platforms || [];
-    const next = have.includes(plat)
-      ? have.filter((p) => p !== plat)
-      : [...have, plat];
-    set({ platforms: next });
+  // Multi-select helper: add/remove a value from a list-valued filter key.
+  const toggleMulti = (key, value) => {
+    const have = filters[key] || [];
+    const next = have.includes(value) ? have.filter((v) => v !== value) : [...have, value];
+    set({ [key]: next });
   };
 
   const isDefault =
@@ -37,6 +35,7 @@ export default function Controls({ filters, options, onChange, resultCount, save
     !filters.mood &&
     !filters.strategy &&
     !filters.savedOnly &&
+    (filters.combos || []).length === 0 &&
     (filters.platforms || []).length === 0;
 
   return (
@@ -82,10 +81,24 @@ export default function Controls({ filters, options, onChange, resultCount, save
         </div>
       </Group>
 
+      <Group label="Type combination">
+        <div className="chips">
+          {options.combos.map((c) => (
+            <Chip
+              key={c.key}
+              active={(filters.combos || []).includes(c.key)}
+              onClick={() => toggleMulti("combos", c.key)}
+            >
+              {c.label}
+            </Chip>
+          ))}
+        </div>
+      </Group>
+
       <Group label="Available on">
         <div className="chips">
           {options.platforms.map((p) => (
-            <Chip key={p} active={(filters.platforms || []).includes(p)} onClick={() => togglePlatform(p)}>
+            <Chip key={p} active={(filters.platforms || []).includes(p)} onClick={() => toggleMulti("platforms", p)}>
               {PLATFORM_LABELS[p] || p}
             </Chip>
           ))}
@@ -99,7 +112,7 @@ export default function Controls({ filters, options, onChange, resultCount, save
         <button
           className="controls__clear"
           onClick={() =>
-            onChange({ useCase: null, mood: null, strategy: null, platforms: [], savedOnly: false })
+            onChange({ useCase: null, mood: null, strategy: null, combos: [], platforms: [], savedOnly: false })
           }
           disabled={isDefault}
         >

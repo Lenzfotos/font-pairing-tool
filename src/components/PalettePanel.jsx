@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { readableOn } from "../lib/colors.js";
+import { readableOn, HARMONIES } from "../lib/colors.js";
 
 const HARMONY_LABELS = {
   complementary: "Complementary",
@@ -10,7 +10,8 @@ const HARMONY_LABELS = {
 
 // Shows the generated palette: the harmony name, the key role swatches (click to
 // copy the hex), and the accent ramp. Colors come from the engine, not the data.
-export default function PalettePanel({ palette }) {
+// Customization (accent color + harmony) is optional and flows up via callbacks.
+export default function PalettePanel({ palette, customized, onAccentChange, onHarmonyChange, onReset }) {
   const [copied, setCopied] = useState(null);
 
   const copy = async (hex) => {
@@ -54,6 +55,37 @@ export default function PalettePanel({ palette }) {
         {palette.ramp.map((hex, i) => (
           <span key={i} className="ramp-step" style={{ background: hex }} />
         ))}
+      </div>
+
+      <div className="customize">
+        <label className="customize__accent">
+          <input
+            type="color"
+            value={palette.roles.accent}
+            onChange={(e) => onAccentChange(e.target.value)}
+            aria-label="Accent color"
+          />
+          <span>Accent</span>
+        </label>
+
+        <div className="customize__harmonies" role="group" aria-label="Harmony">
+          {HARMONIES.map((h) => (
+            <button
+              key={h}
+              type="button"
+              className={`chip chip--sm ${palette.harmony === h ? "chip--on" : ""}`}
+              onClick={() => onHarmonyChange(h)}
+            >
+              {HARMONY_LABELS[h]}
+            </button>
+          ))}
+        </div>
+
+        {customized && (
+          <button type="button" className="customize__reset" onClick={onReset}>
+            Reset
+          </button>
+        )}
       </div>
     </section>
   );

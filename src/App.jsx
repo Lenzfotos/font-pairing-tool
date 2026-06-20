@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PAIRINGS } from "./data/pairings.js";
-import { matchesFilters, deriveOptions } from "./lib/filters.js";
-import { generatePalette } from "./lib/colors.js";
+import { matchesFilters, deriveOptions, comboOf } from "./lib/filters.js";
+import { generatePalette, seedAccent } from "./lib/colors.js";
 import { pairingIdFromHash } from "./lib/export.js";
 import { buildCatalog, rankPairings, pickGenerated } from "./lib/engine.js";
 import Controls from "./components/Controls.jsx";
@@ -16,9 +16,12 @@ const EMPTY_FILTERS = {
   useCase: null,
   mood: null,
   strategy: null,
+  combos: [], // empty = any category combination (serif/sans pairing types)
   platforms: [], // empty = no platform constraint (all seed fonts are on Google)
   savedOnly: false,
 };
+
+const NO_COLOR_OVERRIDE = { id: null, accent: null, harmony: null };
 
 function loadSaved() {
   try {
@@ -39,6 +42,9 @@ export default function App() {
   const [saved, setSaved] = useState(loadSaved);
   // A live algorithmically-generated pairing; when set it overrides browsing.
   const [generated, setGenerated] = useState(null);
+  // Per-pairing color customization (accent / harmony). `id` ties the override
+  // to a pairing so it never bleeds onto a different one.
+  const [colorOverride, setColorOverride] = useState(NO_COLOR_OVERRIDE);
 
   const options = useMemo(() => deriveOptions(PAIRINGS), []);
   const matches = useMemo(() => {
@@ -60,11 +66,26 @@ export default function App() {
   const activeIndex = foundIndex >= 0 ? foundIndex : 0;
   const current = generated ?? matches[activeIndex]; // undefined when nothing matches
 
-  // Generate the palette for the active pairing (memoized on the seed).
-  const palette = useMemo(
-    () => (current ? generatePalette(current.palettes[0]) : null),
-    [current]
-  );
+  // Color customization that applies only to the current pairing.
+  const activeOverride =
+    current && colorOverride.id === current.id ? colorOverride : NO_COLOR_OVERRIDE;
+  const customized = Boolean(activeOverride.accent || activeOverride.harmony);
+
+  // Generate the palette for the active pairing, folding in any override.
+  const palette = useMemo(() => {
+    if (!current) return null;
+    const base = current.palettes[0];
+    return generatePalette({
+      harmony: activeOverride.harmony ?? base.harmony,
+      colors: ["", activeOverride.accent ?? seedAccent(base)],
+    });
+  }, [current, activeOverride.accent, activeOverride.harmony]);
+
+  const setAccent = (hex) =>
+    setColorOverride((o) => ({ id: current.id, accent: hex, harmony: o.id === current.id ? o.harmony : null }));
+  const setHarmony = (h) =>
+    setColorOverride((o) => ({ id: current.id, harmony: h, accent: o.id === current.id ? o.accent : null }));
+  const resetColors = () => setColorOverride(NO_COLOR_OVERRIDE);
 
   const handleFilters = (next) => {
     setFilters(next);
@@ -82,11 +103,13 @@ export default function App() {
     setActiveId(matches[nextIndex].id);
   };
 
-  // Produce a fresh algorithmic pairing, honoring an active strategy filter.
+  // Produce a fresh algorithmic pairing, honoring active strategy + combo filters.
   const handleGenerate = () => {
-    const pool = filters.strategy
-      ? ranked.filter((r) => r.strategy === filters.strategy)
-      : ranked;
+    let pool = ranked;
+    if (filters.strategy) pool = pool.filter((r) => r.strategy === filters.strategy);
+    if (filters.combos?.length) {
+      pool = pool.filter((r) => filters.combos.includes(comboOf(r.h.category, r.b.category)));
+    }
     const next = pickGenerated(pool, generated?.id);
     if (next) setGenerated(next);
   };
@@ -146,7 +169,13 @@ export default function App() {
           <>
             <PreviewPanel pairing={current} palette={applyColor ? palette : null} />
 
-            <PalettePanel palette={palette} />
+            <PalettePanel
+              palette={palette}
+              customized={customized}
+              onAccentChange={setAccent}
+              onHarmonyChange={setHarmony}
+              onReset={resetColors}
+            />
 
             <footer className="stage__nav">
               {generated ? (
@@ -212,11 +241,18 @@ export default function App() {
             <p className="empty__title">
               {filters.savedOnly && saved.size === 0
                 ? "You haven't saved any pairings yet."
-                : "No pairings match these filters."}
+                : "No curated pairings match these filters."}
             </p>
-            <button className="btn" onClick={() => handleFilters(EMPTY_FILTERS)}>
-              Clear filters
-            </button>
+            <div className="empty__actions">
+              {!filters.savedOnly && (
+                <button className="btn btn--generate" onClick={handleGenerate}>
+                  ✨ Generate one
+                </button>
+              )}
+              <button className="btn" onClick={() => handleFilters(EMPTY_FILTERS)}>
+                Clear filters
+              </button>
+            </div>
           </div>
         )}
       </main>
